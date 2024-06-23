@@ -1,42 +1,48 @@
 package io.evitadb;
 
 
-import java.net.http.HttpRequest;
-import java.net.http.HttpResponse;
+import com.linecorp.armeria.common.HttpRequest;
+import com.linecorp.armeria.common.HttpResponse;
+import com.linecorp.armeria.common.HttpStatus;
+import com.linecorp.armeria.common.MediaType;
+import com.linecorp.armeria.server.HttpService;
+import com.linecorp.armeria.server.Server;
+import com.linecorp.armeria.server.ServerBuilder;
+import com.linecorp.armeria.server.ServiceRequestContext;
+
 
 /**
  * TODO JNO - document me
  *
  * @author Jan Novotný (novotny@fg.cz), FG Forrest a.s. (c) 2024
  */
-public class Main {
-    public static void main(String[] args) {
-        System.out.println("Hello world!");
-    }
-}
-
-public class TestHttpService implements HttpService {
-    @Override
-    public HttpResponse serve(ServiceRequestContext ctx, HttpRequest req) throws Exception {
-        final String bodyContent = extractBodyContent(req);
-        // process the body content here
-        return HttpResponse.of(200);
-    }
-
-    private String extractBodyContent(HttpRequest req) {
-        return req.aggregate().join().contentUtf8();
-    }
-}
-class ServerInit {
+public class ServerInit {
     private static Server server;
+
     public static void main(String[] args) {
         ServerBuilder sb = Server.builder();
         sb.http(8080);
-        sb.blockingTaskExecutor(4); // this would be an instance of our thread pool used from within the application
-        sb.serviceWorkerGroup(8);
         sb.service("/test", new TestHttpService());
         server = sb.build();
         server.closeOnJvmShutdown();
         server.start().join();
     }
+
+    public static class TestHttpService implements HttpService {
+
+        @Override
+        public HttpResponse serve(ServiceRequestContext ctx, HttpRequest req) throws Exception {
+            // process the body content here
+            return HttpResponse.of(
+                    req
+                            .aggregate()
+                            .thenApply(aReq -> {
+                                final String bodyContent = aReq.contentUtf8();
+                                // Process the body here
+                                return HttpResponse.of(HttpStatus.OK, MediaType.PLAIN_TEXT_UTF_8, bodyContent);
+                            })
+            );
+        }
+    }
+
 }
